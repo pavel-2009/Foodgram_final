@@ -2,9 +2,9 @@ from django.db import models
 
 
 class Tag(models.Model):
-    name = models.CharField()
-    color = models.CharField()
-    slug = models.SlugField(unique=True)
+    name: str = models.CharField()
+    color: str = models.CharField()
+    slug: str = models.SlugField(unique=True)
 
     def __str__(self):
         return self.name
