@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-    test_and_clean_with_flake8:
+    test_and_clean_with_flake8_and_mypy:
         runs-on: ubuntu-latest
 
         steps:
@@ -26,6 +26,7 @@ jobs:
             python -m pip install --upgrade pip
             pip install -r backend/requirements.txt
             pip install flake8
+            pip install mypy
 
         - name: Run tests
           run: |
@@ -36,8 +37,12 @@ jobs:
           run: |
             flake8 backend
 
+        - name: Run mypy
+          run: |
+            mypy backend
+
     build_and_push_docker_image:
-        needs: test_and_clean_with_flake8
+        needs: test_and_clean_with_flake8_and_mypy
 
         runs-on: ubuntu-latest
 
