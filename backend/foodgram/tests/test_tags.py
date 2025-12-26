@@ -64,6 +64,10 @@ class TagModelTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('Vegan', str(response.content))
 
+    def test_unexisting_tag_detail(self):
+        response = self.client.get('/api/tags/999/')
+        self.assertEqual(response.status_code, 404)
+
     def test_put_tag(self):
         response = self.client.put(f'/api/tags/{self.tag.id}/', {
             'name': 'UpdatedVegan',
