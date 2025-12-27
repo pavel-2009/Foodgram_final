@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'tags.apps.TagsConfig',
+    'ingredients.apps.IngredientsConfig',
     'rest_framework',
 ]
 
