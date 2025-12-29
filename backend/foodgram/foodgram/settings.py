@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
-from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,8 +41,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',
+    'djoser',
     'tags.apps.TagsConfig',
     'ingredients.apps.IngredientsConfig',
     'users.apps.UsersConfig',
@@ -95,20 +95,20 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation\
-            .UserAttributeSimilarityValidator',
+        'NAME': 'django.contrib.auth.password_validation.\
+            UserAttributeSimilarityValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation\
-            .MinimumLengthValidator',
+        'NAME': 'django.contrib.auth.password_validation.\
+            MinimumLengthValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation\
-            .CommonPasswordValidator',
+        'NAME': 'django.contrib.auth.password_validation.\
+            CommonPasswordValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation\
-            .NumericPasswordValidator',
+        'NAME': 'django.contrib.auth.password_validation.\
+            NumericPasswordValidator',
     },
 ]
 
@@ -139,7 +139,6 @@ REST_FRAMEWORK = {
     )
 }
 
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+DJOSER = {
+    'LOGIN_FIELD': 'email',
 }

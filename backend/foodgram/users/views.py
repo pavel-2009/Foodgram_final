@@ -29,7 +29,7 @@ class UserViewSet(ModelViewSet):
 
         user = request.user
         if not user.check_password(current_password):
-            return Response({'status': 'current password is incorrect'},
+            return Response({'current_password': 'Wrong password.'},
                             status=400)
 
         user.set_password(new_password)
