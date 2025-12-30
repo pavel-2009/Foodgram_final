@@ -1,8 +1,9 @@
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
 
 from .serializers import UserSerializer
 
@@ -44,3 +45,26 @@ class UserViewSet(ModelViewSet):
         data = serializer.data
         data.pop('password', None)
         return Response(data, status=201, headers=headers)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login(request):
+    email = request.data.get('email')
+    password = request.data.get('password')
+    try:
+        user = User.objects.get(email=email)
+        if not user.check_password(password):
+            return Response({'error': 'Invalid credentials'}, status=400)
+    except User.DoesNotExist:
+        return Response({'error': 'Invalid credentials'}, status=400)
+
+    token, created = Token.objects.get_or_create(user=user)
+    return Response({'auth_token': token.key})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    request.auth.delete()
+    return Response(status=204)
