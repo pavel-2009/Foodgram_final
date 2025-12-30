@@ -1,0 +1,9 @@
+[flake8]
+exclude = 
+    */migrations/*,
+    */venv/*,
+    */env/*,
+    __pycache__,
+    .git,
+    settings/*,
+    env/
