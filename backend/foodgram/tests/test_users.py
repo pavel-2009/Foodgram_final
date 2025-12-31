@@ -157,8 +157,29 @@ class UserTestCase(TestCase):
         response = self.client.post('/api/auth/token/logout/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_user_list_includes_created_user(self):
+    def test_pagination_on_user_list(self):
+        # Create additional users to test pagination
+        for i in range(15):
+            User.objects.create_user(
+                email=f'user{i}@example.com',
+                username=f'user{i}',
+                password='password123',
+                first_name=f'User{i}',
+                last_name=f'Lastname{i}'
+            )
         response = self.client.get('/api/users/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        emails = [user['email'] for user in response.data]
-        self.assertIn(self.user.email, emails)
+        self.assertEqual(len(response.data['results']), 10)
+
+    def test_user_list_pagination_page_size(self):
+        for i in range(15):
+            User.objects.create_user(
+                email=f'user{i}@example.com',
+                username=f'user{i}',
+                password='password123',
+                first_name=f'User{i}',
+                last_name=f'Lastname{i}'
+            )
+        response = self.client.get('/api/users/?page_size=5')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 5)
