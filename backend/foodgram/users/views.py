@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 
 from .serializers import UserSerializer
+from .pagination import PageLimitPagination
 
 User = get_user_model()
 
@@ -14,6 +15,7 @@ class UserViewSet(ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
+    pagination_class = PageLimitPagination
 
     @action(detail=False, methods=['get'],
             permission_classes=[IsAuthenticated])
