@@ -14,7 +14,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             self.permission_classes = [permissions.AllowAny]
-        elif self.action in ['patch', 'delete', 'update']:
+        elif self.action in ['partial_update', 'destroy', 'update']:
             self.permission_classes = [user_permissions.IsAuthorOrReadOnly]
         return [permission() for permission in self.permission_classes]
 

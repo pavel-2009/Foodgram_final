@@ -34,10 +34,12 @@ class Recipe(models.Model):
         return self.name
 
     def clean(self):
-        if self.cooking_time <= 1:
+        if self.cooking_time < 1:
             raise ValidationError('Cooking time must be a positive integer.')
-        if not base64.b64encode(base64.b64decode(self.image.read())) == self.image.read():  # noqa
-            raise ValidationError('Image must be in base64 format.')
+        try:
+            base64.b64decode(self.image, validate=True)
+        except Exception:
+            raise ValidationError('Image must be in valid base64 format.')
         return super().clean()
 
 

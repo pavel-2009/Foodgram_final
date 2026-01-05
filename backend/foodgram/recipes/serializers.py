@@ -1,6 +1,5 @@
 from rest_framework import serializers
 
-from users.serializers import UserSerializer
 from tags.serializers import TagSerializer
 from .models import Recipe, RecipeIngredient
 from tags.models import Tag
@@ -20,10 +19,11 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
 
 class RecipeSerializer(serializers.ModelSerializer):
-    author = UserSerializer(read_only=True)
+    author = serializers.ReadOnlyField(source='author.id')
     ingredients = RecipeIngredientSerializer(
         source='recipe_ingredients',
-        many=True
+        many=True,
+        required=False
     )
     tags = serializers.PrimaryKeyRelatedField(
         many=True,
@@ -39,7 +39,14 @@ class RecipeSerializer(serializers.ModelSerializer):
             'ingredients', 'name',
             'image', 'text', 'cooking_time',
         ]
-        required_fields = ['ingredients', 'tags', 'image', 'name', 'text', 'cooking_time']  # noqa
+        extra_kwargs = {
+            'ingredients': {'required': True},
+            'tags': {'required': True},
+            'image': {'required': True},
+            'name': {'required': True},
+            'text': {'required': True},
+            'cooking_time': {'required': True},
+        }
 
     def create(self, validated_data):
         ingredients_data = self.initial_data.get('ingredients', [])
@@ -70,6 +77,41 @@ class RecipeSerializer(serializers.ModelSerializer):
             )
 
         return recipe
+
+    def update(self, instance, validated_data):
+        ingredients_data = self.initial_data.get('ingredients')
+        tags_data = validated_data.pop('tags', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if tags_data is not None:
+            instance.tags.set(tags_data)
+
+        if ingredients_data is not None:
+            instance.recipe_ingredients.all().delete()
+
+            from ingredients.models import Ingredient
+
+            ingredients_dict = {}
+            for ingredient_data in ingredients_data:
+                ingredient_id = ingredient_data.get('id')
+                amount = ingredient_data.get('amount', 0)
+
+                ingredients_dict[ingredient_id] = (
+                    ingredients_dict.get(ingredient_id, 0) + amount
+                )
+
+            for ingredient_id, total_amount in ingredients_dict.items():
+                ingredient = Ingredient.objects.get(id=ingredient_id)
+                RecipeIngredient.objects.create(
+                    recipe=instance,
+                    ingredient=ingredient,
+                    amount=total_amount
+                )
+
+        instance.save()
+        return instance
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
