@@ -183,3 +183,68 @@ class UserTestCase(TestCase):
         response = self.client.get('/api/users/?page_size=5')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 5)
+
+    def test_filters_on_recipes_list(self):
+        from tags.models import Tag
+        from ingredients.models import Ingredient
+        from recipes.models import Recipe
+
+        tag1 = Tag.objects.create(name='Tag1', color='#FF0000', slug='tag1')
+        tag2 = Tag.objects.create(name='Tag2', color='#00FF00', slug='tag2')
+
+        ingredient1 = Ingredient.objects.create(name='Ingredient1', measurement_unit='g')  # noqa
+        ingredient2 = Ingredient.objects.create(name='Ingredient2', measurement_unit='ml')  # noqa
+
+        recipe1 = Recipe.objects.create(
+            author=self.user,
+            name='Recipe1',
+            image='',
+            text='Test recipe 1',
+            cooking_time=10
+        )
+        recipe1.tags.add(tag1)
+        recipe1.ingredients.add(ingredient1)
+
+        recipe2 = Recipe.objects.create(
+            author=self.user,
+            name='Recipe2',
+            image='',
+            text='Test recipe 2',
+            cooking_time=20
+        )
+        recipe2.tags.add(tag2)
+        recipe2.ingredients.add(ingredient2)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+        response = self.client.get('/api/recipes/?author={}'.format(self.user.id))  # noqa
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+        response = self.client.get('/api/recipes/?tags=tag1')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['name'], 'Recipe1')
+
+    def test_filters_on_recipes_list_no_results(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.get('/api/recipes/?tags=nonexistenttag')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_create_with_tags(self):
+        from tags.models import Tag
+        tag1 = Tag.objects.create(name='Tag1', color='#FF0000', slug='tag1')
+        tag2 = Tag.objects.create(name='Tag2', color='#00FF00', slug='tag2')
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.post('/api/recipes/', {
+            'name': 'New Recipe',
+            'image': '',
+            'text': 'This is a new recipe',
+            'cooking_time': 15,
+            'tags': [tag1.id, tag2.id],
+            'ingredients': []
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data['tags']), 2)
