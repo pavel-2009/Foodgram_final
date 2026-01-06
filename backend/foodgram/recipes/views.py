@@ -19,19 +19,29 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return [permission() for permission in self.permission_classes]
 
     def get_queryset(self):
+        user = self.request.user
         is_favorited = self.request.query_params.get('is_favorited')
         is_in_shopping_cart = self.request.query_params.get('is_in_shopping_cart')  # noqa
         author = self.request.query_params.get('author')
         tags = self.request.query_params.getlist('tags')
 
-        queryset = Recipe.objects.all()
+        queryset = Recipe.objects.all().order_by('id')
 
-        if is_favorited:
-            queryset = queryset.filter(is_favorited=(True if is_favorited == '1' else False))  # noqa
-        if is_in_shopping_cart:
-            queryset = queryset.filter(is_in_shopping_cart=(True if is_in_shopping_cart == '1' else False))  # noqa
+        if is_favorited is not None and user.is_authenticated:
+            if is_favorited == '1':
+                queryset = queryset.filter(favorited_by__user=user)
+            else:
+                queryset = queryset.exclude(favorited_by__user=user)
+
+        if is_in_shopping_cart is not None and user.is_authenticated:
+            if is_in_shopping_cart == '1':
+                queryset = queryset.filter(in_carts__user=user)
+            else:
+                queryset = queryset.exclude(in_carts__user=user)
+
         if author:
             queryset = queryset.filter(author__id=author)
+
         if tags:
             queryset = queryset.filter(tags__slug__in=tags)
 

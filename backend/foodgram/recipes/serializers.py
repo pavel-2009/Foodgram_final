@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from tags.serializers import TagSerializer
-from .models import Recipe, RecipeIngredient
+from .models import Recipe, RecipeIngredient, Favorite, ShoppingCart
 from tags.models import Tag
 
 
@@ -29,8 +29,8 @@ class RecipeSerializer(serializers.ModelSerializer):
         many=True,
         queryset=Tag.objects.all()
     )
-    is_favorited = serializers.BooleanField(read_only=True)
-    is_in_shopping_cart = serializers.BooleanField(read_only=True)
+    is_favorited = serializers.SerializerMethodField()
+    is_in_shopping_cart = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -48,9 +48,22 @@ class RecipeSerializer(serializers.ModelSerializer):
             'cooking_time': {'required': True},
         }
 
+    def get_is_favorited(self, obj):
+        user = self.context['request'].user
+        if not user.is_authenticated:
+            return False
+        return Favorite.objects.filter(user=user, recipe=obj).exists()
+
+    def get_is_in_shopping_cart(self, obj):
+        user = self.context['request'].user
+        if not user.is_authenticated:
+            return False
+        return ShoppingCart.objects.filter(user=user, recipe=obj).exists()
+
     def create(self, validated_data):
         ingredients_data = self.initial_data.get('ingredients', [])
         tags_data = validated_data.pop('tags')
+        validated_data.pop('recipe_ingredients', None)
         author = self.context['request'].user
         validated_data['author'] = author
         recipe = Recipe.objects.create(**validated_data)

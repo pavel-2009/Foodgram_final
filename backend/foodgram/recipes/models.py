@@ -27,8 +27,6 @@ class Recipe(models.Model):
     image: models.CharField = models.CharField()
     text: models.TextField = models.TextField()
     cooking_time: models.PositiveIntegerField = models.PositiveIntegerField()
-    is_favorited: models.BooleanField = models.BooleanField(default=False)
-    is_in_shopping_cart: models.BooleanField = models.BooleanField(default=False)  # noqa
 
     def __str__(self):
         return self.name
@@ -54,10 +52,42 @@ class RecipeIngredient(models.Model):
         on_delete=models.CASCADE,
         related_name='recipe_ingredients',
     )
-    amount: models.FloatField = models.FloatField()
+    amount: models.FloatField = models.FloatField(default=1.0)
 
     class Meta:
         unique_together = ('recipe', 'ingredient')
 
     def __str__(self):
         return f"{self.recipe.name} - {self.ingredient.name} ({self.amount})"
+
+
+class Favorite(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='favorites'
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='favorited_by'
+    )
+
+    class Meta:
+        unique_together = ('user', 'recipe')
+
+
+class ShoppingCart(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='shopping_cart'
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='in_carts'
+    )
+
+    class Meta:
+        unique_together = ('user', 'recipe')
