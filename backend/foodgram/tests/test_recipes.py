@@ -6,7 +6,7 @@ from rest_framework import status
 from tags.models import Tag
 from users.models import User
 from ingredients.models import Ingredient
-from recipes.models import Recipe, RecipeIngredient
+from recipes.models import Recipe, RecipeIngredient, Favorite, ShoppingCart
 
 
 class RecipeModelTest(TestCase):
@@ -60,11 +60,12 @@ class RecipeModelTest(TestCase):
     def test_recipe_string_representation(self):
         self.assertEqual(str(self.recipe), 'Test Recipe')
 
-    def test_is_favorited_default(self):
-        self.assertFalse(self.recipe.is_favorited)
+    def test_flags_default(self):
+        response = self.client.get(f'/api/recipes/{self.recipe.id}/')
+        data = response.data
 
-    def test_is_in_shopping_cart_default(self):
-        self.assertFalse(self.recipe.is_in_shopping_cart)
+        self.assertFalse(data['is_favorited'])
+        self.assertFalse(data['is_in_shopping_cart'])
 
     def test_recipeingredient_string_representation(self):
         recipe_ingredient = RecipeIngredient.objects.get(
@@ -112,19 +113,26 @@ class RecipeAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+
+        self.ingredient1 = Ingredient.objects.create(name='Flour',
+                                                     measurement_unit='grams')
+        self.ingredient2 = Ingredient.objects.create(name='Eggs',
+                                                     measurement_unit='pieces')
+
+        self.tag1 = Tag.objects.create(name='Dinner',
+                                       color='#3357FF', slug='dinner')
+        self.tag2 = Tag.objects.create(name='Snack',
+                                       color='#FF33A1', slug='snack')
+
         self.user = User.objects.create_user(username='apiuser',
                                              password='apipass',
                                              email='apiuser@example.com')
         self.author = User.objects.create_user(username='apiauthor',
                                                password='apiauthpass',
                                                email='apiauthor@example.com')
-        self.other_user = User.objects.create_user(username='otheruser',
-                                                   password='otherpass',
-                                                   email='otheruser@example.com')  # noqa
 
         self.user_token = Token.objects.create(user=self.user)
         self.author_token = Token.objects.create(user=self.author)
-        self.other_user_token = Token.objects.create(user=self.other_user)
 
         self.recipe = Recipe.objects.create(
             author=self.author,
@@ -149,7 +157,6 @@ class RecipeAPITest(TestCase):
 
     def test_create_recipe_api(self):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
-        from tags.models import Tag
         tag = Tag.objects.create(name='Test', color='#FF5733', slug='test')
 
         data = {
@@ -245,7 +252,7 @@ class RecipeAPITest(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_not_author_cannot_update_recipe_api(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.other_user_token.key}')  # noqa
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         data = {
             'name': 'Attempted Unauthorized Update',
             'cooking_time': 40
@@ -254,15 +261,11 @@ class RecipeAPITest(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_not_author_cannot_delete_recipe_api(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.other_user_token.key}')  # noqa
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.delete(f'/api/recipes/{self.recipe.id}/')
         self.assertEqual(response.status_code, 403)
 
     def test_filters_on_recipes_list(self):
-        from tags.models import Tag
-        from ingredients.models import Ingredient
-        from recipes.models import Recipe
-
         tag1 = Tag.objects.create(name='Tag1', color='#FF0000', slug='tag1')
         tag2 = Tag.objects.create(name='Tag2', color='#00FF00', slug='tag2')
 
@@ -289,32 +292,53 @@ class RecipeAPITest(TestCase):
         recipe2.tags.add(tag2)
         recipe2.ingredients.add(ingredient2)
 
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
 
-        response = self.client.get('/api/recipes/?author={}'.format(self.user.id))  # noqa
+        response = self.client.get(f'/api/recipes/?author={self.user.id}')  # noqa
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data['results']), 2)
 
         response = self.client.get('/api/recipes/?tags=tag1')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['name'], 'Recipe1')
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Recipe1')
 
     def test_filters_on_recipes_list_no_results(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.get('/api/recipes/?tags=nonexistenttag')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data['results']), 0)
+
+    def test_filters_is_favorited(self):
+        Favorite.objects.create(user=self.user, recipe=self.recipe)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
+        response = self.client.get('/api/recipes/?is_favorited=1')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['id'], self.recipe.id)
+
+    def test_filters_is_in_shopping_cart(self):
+        ShoppingCart.objects.create(user=self.user, recipe=self.recipe)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
+        response = self.client.get('/api/recipes/?is_in_shopping_cart=1')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['id'], self.recipe.id)
 
     def test_create_with_tags(self):
         from tags.models import Tag
         tag1 = Tag.objects.create(name='Tag1', color='#FF0000', slug='tag1')
         tag2 = Tag.objects.create(name='Tag2', color='#00FF00', slug='tag2')
 
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.post('/api/recipes/', {
             'name': 'New Recipe',
-            'image': '',
+            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
+                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
+                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
+                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
             'text': 'This is a new recipe',
             'cooking_time': 15,
             'tags': [tag1.id, tag2.id],
@@ -322,18 +346,22 @@ class RecipeAPITest(TestCase):
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(len(response.data['tags']), 2)
-        self.assertIn(tag1.id, response.data['tags'])
-        self.assertIn(tag2.id, response.data['tags'])
+        tag_ids = [tag['id'] for tag in response.data['tags']]
+        self.assertIn(tag1.id, tag_ids)
+        self.assertIn(tag2.id, tag_ids)
 
     def test_create_with_ingredients(self):
         from ingredients.models import Ingredient
         ingredient1 = Ingredient.objects.create(name='Ingredient1', measurement_unit='g')  # noqa
         ingredient2 = Ingredient.objects.create(name='Ingredient2', measurement_unit='ml')  # noqa
 
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.post('/api/recipes/', {
             'name': 'New Recipe with Ingredients',
-            'image': '',
+            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
+                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
+                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
+                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
             'text': 'This is a new recipe with ingredients',
             'cooking_time': 20,
             'tags': [],
@@ -349,13 +377,15 @@ class RecipeAPITest(TestCase):
         self.assertIn(ingredient2.id, ingredient_ids)
 
     def test_create_with_duplicate_ingredients(self):
-        from ingredients.models import Ingredient
         ingredient = Ingredient.objects.create(name='Ingredient', measurement_unit='g')  # noqa
 
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.post('/api/recipes/', {
             'name': 'Recipe with Duplicate Ingredients',
-            'image': '',
+            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
+                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
+                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
+                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
             'text': 'This recipe has duplicate ingredients',
             'cooking_time': 25,
             'tags': [],
