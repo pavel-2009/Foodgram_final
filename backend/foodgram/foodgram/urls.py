@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/tags/', include('tags.urls')),
     path('api/ingredients/', include('ingredients.urls')),
     path('api/users/', include('users.urls')),
+    path('api/recipes/', include('recipes.urls')),
     path('api/auth/token/login/', users_views.login, name='login'),
     path('api/auth/token/logout/', users_views.logout, name='logout'),
 ]
