@@ -62,12 +62,12 @@ class RecipeIngredient(models.Model):
 
 
 class Favorite(models.Model):
-    user = models.ForeignKey(
+    user: models.ForeignKey = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='favorites'
     )
-    recipe = models.ForeignKey(
+    recipe: models.ForeignKey = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         related_name='favorited_by'
@@ -78,12 +78,12 @@ class Favorite(models.Model):
 
 
 class ShoppingCart(models.Model):
-    user = models.ForeignKey(
+    user: models.ForeignKey = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='shopping_cart'
     )
-    recipe = models.ForeignKey(
+    recipe: models.ForeignKey = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         related_name='in_carts'
