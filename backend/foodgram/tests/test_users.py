@@ -4,6 +4,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework import status
 from rest_framework.test import APIClient
 
+# from users.models import UserSubscription
+
 User = get_user_model()
 
 
@@ -158,7 +160,6 @@ class UserTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_pagination_on_user_list(self):
-        # Create additional users to test pagination
         for i in range(15):
             User.objects.create_user(
                 email=f'user{i}@example.com',
@@ -183,3 +184,7 @@ class UserTestCase(TestCase):
         response = self.client.get('/api/users/?page_size=5')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 5)
+
+
+class UserSubscriptionTestCase(TestCase):
+    pass

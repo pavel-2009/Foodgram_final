@@ -396,3 +396,50 @@ class RecipeAPITest(TestCase):
         }, format='json')
         self.assertEqual(response.data['ingredients'][0]['id'], ingredient.id)
         self.assertEqual(response.data['ingredients'][0]['amount'], 250)
+
+
+class TestFavoriteModel(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='favuser',
+                                             password='favpass',)
+
+        self.recipe = Recipe.objects.create(
+            author=self.user,
+            name='API Test Recipe',
+            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
+                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
+                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
+                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            text='This is a test recipe for API.',
+            cooking_time=15
+        )
+
+    def test_favorite_creation(self):
+        favorite = Favorite.objects.create(user=self.user, recipe=self.recipe)
+        self.assertEqual(favorite.user.username, 'favuser')
+        self.assertEqual(favorite.recipe.name, 'API Test Recipe')
+
+    def test_favorite_unique_constraint(self):
+        Favorite.objects.create(user=self.user, recipe=self.recipe)
+        with self.assertRaises(Exception):
+            Favorite.objects.create(user=self.user, recipe=self.recipe)
+
+    def test_add_to_favorite_api(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = client.post(f'/api/recipes/{self.recipe.id}/favorite/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('API Test Recipe', str(response.content))
+
+    def test_remove_from_favorite_api(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        Favorite.objects.create(user=self.user, recipe=self.recipe)
+
+        response = client.delete(f'/api/recipes/{self.recipe.id}/favorite/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
