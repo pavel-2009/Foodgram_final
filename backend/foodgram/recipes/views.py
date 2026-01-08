@@ -1,8 +1,7 @@
 from rest_framework import viewsets
 from rest_framework import permissions
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.generics import get_object_or_404
 
 from .serializers import RecipeSerializer
 from .models import Recipe, Favorite
@@ -50,29 +49,20 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         return queryset.distinct()
 
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])  # noqa
+    def favorite(self, request, pk=None):
+        recipe = self.get_object()
+        user = request.user
 
-class FavoriteView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+        if request.method == 'POST':
+            Favorite.objects.get_or_create(user=user, recipe=recipe)
+            return Response({
+                'id': recipe.id,
+                'name': recipe.name,
+                'image': recipe.image,
+                'cooking_time': recipe.cooking_time
+            }, status=201)
 
-    def post(self, request, id):
-        recipe = get_object_or_404(Recipe, id=id)
-        Favorite.objects.create(user=request.user, recipe=recipe)
-        return Response(RecipeSerializer(recipe).data, status=201)
-
-    def delete(self, request, id):
-        recipe = get_object_or_404(Recipe, id=id)
-        Favorite.objects.filter(user=request.user, recipe=recipe).delete()
-        return Response(status=204)
-
-class FavoriteView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, id):
-        recipe = get_object_or_404(Recipe, id=id)
-        Favorite.objects.create(user=request.user, recipe=recipe)
-        return Response(RecipeSerializer(recipe).data, status=201)
-
-    def delete(self, request, id):
-        recipe = get_object_or_404(Recipe, id=id)
-        Favorite.objects.filter(user=request.user, recipe=recipe).delete()
-        return Response(status=204)
+        elif request.method == 'DELETE':
+            Favorite.objects.filter(user=user, recipe=recipe).delete()
+            return Response(status=204)
