@@ -1,8 +1,11 @@
 from rest_framework import viewsets
 from rest_framework import permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.generics import get_object_or_404
 
 from .serializers import RecipeSerializer
-from .models import Recipe
+from .models import Recipe, Favorite
 from . import permissions as user_permissions
 
 
@@ -46,3 +49,30 @@ class RecipeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(tags__slug__in=tags)
 
         return queryset.distinct()
+
+
+class FavoriteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        recipe = get_object_or_404(Recipe, id=id)
+        Favorite.objects.create(user=request.user, recipe=recipe)
+        return Response(RecipeSerializer(recipe).data, status=201)
+
+    def delete(self, request, id):
+        recipe = get_object_or_404(Recipe, id=id)
+        Favorite.objects.filter(user=request.user, recipe=recipe).delete()
+        return Response(status=204)
+
+class FavoriteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        recipe = get_object_or_404(Recipe, id=id)
+        Favorite.objects.create(user=request.user, recipe=recipe)
+        return Response(RecipeSerializer(recipe).data, status=201)
+
+    def delete(self, request, id):
+        recipe = get_object_or_404(Recipe, id=id)
+        Favorite.objects.filter(user=request.user, recipe=recipe).delete()
+        return Response(status=204)
