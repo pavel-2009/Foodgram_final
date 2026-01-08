@@ -8,3 +8,19 @@ class User(AbstractUser):
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+
+
+class UserSubscription(models.Model):
+    user: models.ForeignKey = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='subscriptions'
+    )
+    subscriptions: models.ForeignKey = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='subscribed_users'
+    )
+
+    class Meta:
+        unique_together = ('user', 'subscriptions')
