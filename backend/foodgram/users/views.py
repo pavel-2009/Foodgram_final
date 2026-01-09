@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 
-from .serializers import UserSerializer
+from .serializers import UserSerializer, UserSubscriptionSerializer
 from .pagination import PageLimitPagination
 
 User = get_user_model()
@@ -39,6 +39,55 @@ class UserViewSet(ModelViewSet):
         user.save()
         return Response({'status': 'password set'}, status=204)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated]) # noqa
+    def subscriptions(self, request):
+        user = request.user
+        subscriptions = User.objects.filter(
+            subscribed_users__user=user
+        )
+        page = self.paginate_queryset(subscriptions)
+        if page is not None:
+            serializer = UserSubscriptionSerializer(
+                page,
+                many=True,
+                context={'request': request}
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = UserSubscriptionSerializer(
+            subscriptions,
+            many=True,
+            context={'request': request}
+        )
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])  # noqa
+    def subscribe(self, request, pk=None):
+        user = request.user
+        to_subscribe = self.get_object()
+
+        if request.method == 'DELETE':
+            if not user.subscriptions.filter(subscriptions=to_subscribe).exists():  # noqa
+                return Response({'error': 'You are not subscribed to this user.'},  # noqa
+                                status=400)
+            user.subscriptions.filter(subscriptions=to_subscribe).delete()
+            return Response(status=204)
+
+        if user == to_subscribe:  # noqa
+            return Response({'error': 'You cannot subscribe to yourself.'},
+                            status=400)
+
+        if user.subscriptions.filter(subscriptions=to_subscribe).exists():
+            return Response({'error': 'You are already subscribed to this user.'},  # noqa
+                            status=400)
+
+        user.subscriptions.get_or_create(subscriptions=to_subscribe)
+        serializer = UserSerializer(
+            to_subscribe,
+            context={'request': request}
+        )
+        return Response(serializer.data, status=201)
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -47,6 +96,19 @@ class UserViewSet(ModelViewSet):
         data = serializer.data
         data.pop('password', None)
         return Response(data, status=201, headers=headers)
+
+    def get_queryset(self):
+        recipes_limit = self.request.GET.get('recipes_limit')
+
+        queryset = super().get_queryset()
+        if recipes_limit is not None and self.action == 'subscriptions':
+            try:
+                limit = int(recipes_limit)
+                for user in queryset:
+                    user.recipes_limited = user.recipes.all()[:limit]
+            except ValueError:
+                pass
+        return queryset
 
 
 @api_view(['POST'])

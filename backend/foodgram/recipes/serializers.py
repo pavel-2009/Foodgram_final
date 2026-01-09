@@ -93,10 +93,18 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         ingredients_data = self.initial_data.get('ingredients')
+        validated_data.pop('ingredients', None)
         tags_data = validated_data.pop('tags', None)
 
+        # Update only normal fields (avoid reverse relations)
+        normal_fields = [
+            f.name for f in instance._meta.get_fields()
+            if not (f.many_to_many or f.one_to_many)
+        ]
         for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+            if attr in normal_fields:
+                setattr(instance, attr, value)
+        instance.save()
 
         if tags_data is not None:
             instance.tags.set(tags_data)
@@ -105,12 +113,12 @@ class RecipeSerializer(serializers.ModelSerializer):
             instance.recipe_ingredients.all().delete()
 
             from ingredients.models import Ingredient
+            from recipes.models import RecipeIngredient
 
             ingredients_dict = {}
             for ingredient_data in ingredients_data:
                 ingredient_id = ingredient_data.get('id')
                 amount = ingredient_data.get('amount', 0)
-
                 ingredients_dict[ingredient_id] = (
                     ingredients_dict.get(ingredient_id, 0) + amount
                 )
@@ -123,7 +131,6 @@ class RecipeSerializer(serializers.ModelSerializer):
                     amount=total_amount
                 )
 
-        instance.save()
         return instance
 
     def to_representation(self, instance):

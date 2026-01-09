@@ -1,8 +1,10 @@
 from rest_framework import viewsets
 from rest_framework import permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from .serializers import RecipeSerializer
-from .models import Recipe
+from .models import Recipe, Favorite
 from . import permissions as user_permissions
 
 
@@ -46,3 +48,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(tags__slug__in=tags)
 
         return queryset.distinct()
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])  # noqa
+    def favorite(self, request, pk=None):
+        recipe = self.get_object()
+        user = request.user
+
+        if request.method == 'POST':
+            Favorite.objects.get_or_create(user=user, recipe=recipe)
+            return Response({
+                'id': recipe.id,
+                'name': recipe.name,
+                'image': recipe.image,
+                'cooking_time': recipe.cooking_time
+            }, status=201)
+
+        elif request.method == 'DELETE':
+            Favorite.objects.filter(user=user, recipe=recipe).delete()
+            return Response(status=204)

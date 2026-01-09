@@ -6,7 +6,7 @@ User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-    is_subscribed = serializers.BooleanField(read_only=True)
+    is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -21,3 +21,42 @@ class UserSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation.pop('password', None)
         return representation
+
+    def get_is_subscribed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.subscribed_users.filter(user=request.user).exists()
+        return False
+
+
+class UserSubscriptionSerializer(serializers.ModelSerializer):
+    is_subscribed = serializers.SerializerMethodField()
+    recipes_count = serializers.SerializerMethodField()
+    recipes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('email', 'id', 'username', 'first_name', 'last_name', 'is_subscribed',  # noqa
+                  'recipes_count', 'recipes')
+
+    def get_is_subscribed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.subscribed_users.filter(user=request.user).exists()
+        return False
+
+    def get_recipes_count(self, obj):
+        return obj.recipes.count()
+
+    def get_recipes(self, obj):
+        request = self.context.get('request')
+        recipes_limit = request.query_params.get('recipes_limit')
+        recipes = obj.recipes.all()
+        if recipes_limit is not None and recipes_limit.isdigit():
+            recipes = recipes[:int(recipes_limit)]
+        return [{
+            'id': recipe.id,
+            'name': recipe.name,
+            'image': recipe.image,
+            'cooking_time': recipe.cooking_time
+        } for recipe in recipes]

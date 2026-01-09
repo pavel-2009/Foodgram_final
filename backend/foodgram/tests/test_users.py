@@ -158,7 +158,6 @@ class UserTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_pagination_on_user_list(self):
-        # Create additional users to test pagination
         for i in range(15):
             User.objects.create_user(
                 email=f'user{i}@example.com',
@@ -183,3 +182,104 @@ class UserTestCase(TestCase):
         response = self.client.get('/api/users/?page_size=5')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 5)
+
+
+class UserSubscriptionTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            username='testuser',
+            password='testpassword',
+            first_name='Test',
+            last_name='User'
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.other_user = User.objects.create_user(
+            email='other@example.com',
+            username='otheruser',
+            password='otherpassword',
+            first_name='Other',
+            last_name='User'
+        )
+
+    def test_subscribe_to_user(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.post(f'/api/users/{self.other_user.id}/subscribe/')  # noqa
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_unsubscribe_from_user(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.post(f'/api/users/{self.other_user.id}/subscribe/')
+        response = self.client.delete(f'/api/users/{self.other_user.id}/subscribe/')  # noqa
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_subscribe_to_self(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.post(f'/api/users/{self.user.id}/subscribe/')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unsubscribe_not_subscribed_user(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.delete(f'/api/users/{self.other_user.id}/subscribe/')  # noqa
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_is_subscribed_field(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.post(f'/api/users/{self.other_user.id}/subscribe/')
+        response = self.client.get(f'/api/users/{self.other_user.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_subscribed'])
+
+    def test_subscribe_again(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.post(f'/api/users/{self.other_user.id}/subscribe/')
+        response = self.client.post(f'/api/users/{self.other_user.id}/subscribe/')  # noqa
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unsubscribe_twice(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.post(f'/api/users/{self.other_user.id}/subscribe/')
+        self.client.delete(f'/api/users/{self.other_user.id}/subscribe/')
+        response = self.client.delete(f'/api/users/{self.other_user.id}/subscribe/')    # noqa
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_subscriptions_list(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.post(f'/api/users/{self.other_user.id}/subscribe/')
+        response = self.client.get('/api/users/subscriptions/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['id'], self.other_user.id)
+
+    def test_subscriptions_list_pagination(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        for i in range(15):
+            user = User.objects.create_user(
+                email=f'test{i}@example.com',
+                username=f'testuser{i}',
+                password='testpassword',
+                first_name='Test',
+                last_name='User'
+            )
+            self.client.post(f'/api/users/{user.id}/subscribe/')
+        response = self.client.get('/api/users/subscriptions/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 10)
+
+    def test_recipes_limit_in_subscriptions(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.post(f'/api/users/{self.other_user.id}/subscribe/')
+        response = self.client.get('/api/users/subscriptions/?recipes_limit=2')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('recipes', response.data['results'][0])
