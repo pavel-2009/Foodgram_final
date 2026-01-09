@@ -100,6 +100,22 @@ class RecipeModelTest(TestCase):
         with self.assertRaises(Exception):
             invalid_time_recipe.clean()
 
+    def test_clean_valid_data(self):
+        valid_recipe = Recipe(
+            author=self.author,
+            name='Valid Recipe',
+            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
+                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
+                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
+                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            text='This recipe has valid data.',
+            cooking_time=5
+        )
+        try:
+            valid_recipe.clean()
+        except Exception:
+            self.fail('clean() raised Exception unexpectedly!')
+
     def test_unique_ingredient_per_recipe(self):
         with self.assertRaises(Exception):
             RecipeIngredient.objects.create(
@@ -190,6 +206,10 @@ class RecipeAPITest(TestCase):
         self.assertEqual(response.status_code, 204)
         get_response = self.client.get(f'/api/recipes/{self.recipe.id}/')
         self.assertEqual(get_response.status_code, 404)
+
+    def test_using_a_safe_method_on_recipe_api(self):
+        response = self.client.get(f'/api/recipes/{self.recipe.id}/')
+        self.assertEqual(response.status_code, 200)
 
     def test_create_unauthorized_recipe_api(self):
         data = {
@@ -318,6 +338,10 @@ class RecipeAPITest(TestCase):
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['id'], self.recipe.id)
 
+        response = self.client.get('/api/recipes/?is_favorited=0')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 0)
+
     def test_filters_is_in_shopping_cart(self):
         ShoppingCart.objects.create(user=self.user, recipe=self.recipe)
 
@@ -326,6 +350,10 @@ class RecipeAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['id'], self.recipe.id)
+
+        response = self.client.get('/api/recipes/?is_in_shopping_cart=0')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 0)
 
     def test_create_with_tags(self):
         from tags.models import Tag
@@ -396,6 +424,33 @@ class RecipeAPITest(TestCase):
         }, format='json')
         self.assertEqual(response.data['ingredients'][0]['id'], ingredient.id)
         self.assertEqual(response.data['ingredients'][0]['amount'], 250)
+
+    def test_update_with_tags(self):
+        from tags.models import Tag
+        new_tag = Tag.objects.create(name='NewTag', color='#123456', slug='newtag')  # noqa
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.author_token.key}')  # noqa
+        response = self.client.patch(f'/api/recipes/{self.recipe.id}/', {
+            'tags': [new_tag.id]
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['tags']), 1)
+        self.assertEqual(response.data['tags'][0]['id'], new_tag.id)
+
+    def test_update_with_ingredients(self):
+        from ingredients.models import Ingredient
+        new_ingredient = Ingredient.objects.create(name='NewIngredient', measurement_unit='pcs')  # noqa
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.author_token.key}')  # noqa
+        response = self.client.patch(f'/api/recipes/{self.recipe.id}/', {
+            'ingredients': [
+                {'id': new_ingredient.id, 'amount': 5}
+            ]
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['ingredients']), 1)
+        self.assertEqual(response.data['ingredients'][0]['id'], new_ingredient.id)  # noqa
+        self.assertEqual(response.data['ingredients'][0]['amount'], 5)
 
 
 class TestFavoriteModel(TestCase):
