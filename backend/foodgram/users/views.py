@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 
-from .serializers import UserSerializer
+from .serializers import UserSerializer, UserSubscriptionSerializer
 from .pagination import PageLimitPagination
 
 User = get_user_model()
@@ -47,14 +47,14 @@ class UserViewSet(ModelViewSet):
         )
         page = self.paginate_queryset(subscriptions)
         if page is not None:
-            serializer = UserSerializer(
+            serializer = UserSubscriptionSerializer(
                 page,
                 many=True,
                 context={'request': request}
             )
             return self.get_paginated_response(serializer.data)
 
-        serializer = UserSerializer(
+        serializer = UserSubscriptionSerializer(
             subscriptions,
             many=True,
             context={'request': request}
@@ -96,6 +96,19 @@ class UserViewSet(ModelViewSet):
         data = serializer.data
         data.pop('password', None)
         return Response(data, status=201, headers=headers)
+
+    def get_queryset(self):
+        recipes_limit = self.request.GET.get('recipes_limit')
+
+        queryset = super().get_queryset()
+        if recipes_limit is not None and self.action == 'subscriptions':
+            try:
+                limit = int(recipes_limit)
+                for user in queryset:
+                    user.recipes_limited = user.recipes.all()[:limit]
+            except ValueError:
+                pass
+        return queryset
 
 
 @api_view(['POST'])
