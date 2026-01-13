@@ -66,3 +66,56 @@ class RecipeViewSet(viewsets.ModelViewSet):
         elif request.method == 'DELETE':
             Favorite.objects.filter(user=user, recipe=recipe).delete()
             return Response(status=204)
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])  # noqa
+    def download_shopping_cart(self, request):
+        shopping_cart_items = request.user.shopping_cart.recipes.all()
+        ingredient_totals = {}
+
+        for recipe in shopping_cart_items:
+            for ri in recipe.recipe_ingredients.all():
+                ingredient = ri.ingredient
+                if ingredient.name in ingredient_totals:
+                    ingredient_totals[ingredient.name]['amount'] += ri.amount
+                else:
+                    ingredient_totals[ingredient.name] = {
+                        'measurement_unit': ingredient.measurement_unit,
+                        'amount': ri.amount
+                    }
+
+        lines = ["Shopping List:\n"]
+        for name, details in ingredient_totals.items():
+            lines.append(f"- {name} ({details['measurement_unit']}): {details['amount']}\n")  # noqa
+
+        response = Response(lines, content_type='application/txt')
+        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'  # noqa
+        return response
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])  # noqa
+    def shopping_cart(self, request, pk=None):
+        user = request.user
+        recipe = self.get_object()
+        user_recipes = user.shopping_cart.recipes.all()
+
+        if request.method == 'POST':
+            if recipe in user_recipes:
+                return Response({
+                    'errors': 'Recipe is already in the shopping cart.'
+                }, status=400)
+
+            user.shopping_cart.recipes.add(recipe)
+            return Response({
+                'id': recipe.id,
+                'name': recipe.name,
+                'image': recipe.image,
+                'cooking_time': recipe.cooking_time
+            }, status=201)
+
+        elif request.method == 'DELETE':
+            if recipe not in user_recipes:
+                return Response({
+                    'errors': 'Recipe is not in the shopping cart.'
+                }, status=400)
+
+            user.shopping_cart.recipes.remove(recipe)
+            return Response(status=204)

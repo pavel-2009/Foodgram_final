@@ -83,11 +83,10 @@ class ShoppingCart(models.Model):
         on_delete=models.CASCADE,
         related_name='shopping_cart'
     )
-    recipe: models.ForeignKey = models.ForeignKey(
+    recipes: models.ManyToManyField = models.ManyToManyField(
         Recipe,
-        on_delete=models.CASCADE,
-        related_name='in_carts'
+        related_name='in_shopping_carts'
     )
 
-    class Meta:
-        unique_together = ('user', 'recipe')
+    def __str__(self):
+        return f"{self.user.username} - {self.recipes.name}"
