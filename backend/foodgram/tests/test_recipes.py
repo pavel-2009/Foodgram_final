@@ -343,7 +343,8 @@ class RecipeAPITest(TestCase):
         self.assertEqual(len(response.data['results']), 0)
 
     def test_filters_is_in_shopping_cart(self):
-        ShoppingCart.objects.create(user=self.user, recipe=self.recipe)
+        cart = ShoppingCart.objects.create(user=self.user)
+        cart.recipes.add(self.recipe)
 
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.get('/api/recipes/?is_in_shopping_cart=1')
@@ -498,3 +499,128 @@ class TestFavoriteModel(TestCase):
 
         response = client.delete(f'/api/recipes/{self.recipe.id}/favorite/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class TestShoppingCartModel(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='cartuser',
+                                             password='cartpass',)
+
+        self.ingredient1 = Ingredient.objects.create(name='Flour',
+                                                     measurement_unit='grams')
+
+        self.recipe = Recipe.objects.create(
+            author=self.user,
+            name='Cart Test Recipe',
+            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
+                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
+                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
+                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            text='This is a test recipe for cart.',
+            cooking_time=15
+        )
+
+        RecipeIngredient.objects.create(
+            recipe=self.recipe,
+            ingredient=self.ingredient1,
+            amount=100
+        )
+
+    def test_add_to_shopping_cart_api(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = client.post(f'/api/recipes/{self.recipe.id}/shopping_cart/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('Cart Test Recipe', str(response.content))
+
+    def test_remove_from_shopping_cart_api(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        cart = ShoppingCart.objects.create(user=self.user)
+        cart.recipes.add(self.recipe)
+
+        response = client.delete(f'/api/recipes/{self.recipe.id}/shopping_cart/')  # noqa
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_download_shopping_cart_api(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        cart = ShoppingCart.objects.create(user=self.user)
+        cart.recipes.add(self.recipe)
+
+        response = client.get('/api/recipes/download_shopping_cart/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('Shopping List', str(response.content))
+
+    def test_add_duplicate_to_shopping_cart_api(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = client.post(f'/api/recipes/{self.recipe.id}/shopping_cart/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        response = client.post(f'/api/recipes/{self.recipe.id}/shopping_cart/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_remove_not_in_shopping_cart_api(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = client.delete(f'/api/recipes/{self.recipe.id}/shopping_cart/')  # noqa
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_file_download_content(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        cart = ShoppingCart.objects.create(user=self.user)
+        cart.recipes.add(self.recipe)
+
+        response = client.get('/api/recipes/download_shopping_cart/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'text/plain')
+        self.assertIn('attachment; filename="shopping_list.txt"',
+                      response['Content-Disposition'])
+
+    def test_shopping_cart_unique_constraint(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        response = client.post(f'/api/recipes/{self.recipe.id}/shopping_cart/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        response = client.post(f'/api/recipes/{self.recipe.id}/shopping_cart/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_file_download_body(self):
+        client = APIClient()
+        token = Token.objects.create(user=self.user)
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+        cart = ShoppingCart.objects.create(user=self.user)
+        cart.recipes.add(self.recipe)
+
+        response = client.get('/api/recipes/download_shopping_cart/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/plain')
+        self.assertEqual(response['Content-Disposition'], 'attachment; filename="shopping_list.txt"')  # noqa
+
+        content = response.content.decode('utf-8')
+        self.assertIn('Shopping List:', content)
+        lines = content.split('\n')
+        ingredient = lines[1]
+        self.assertEqual(ingredient, f"- {self.recipe.recipe_ingredients.first().ingredient.name} "  # noqa
+                                     f"({self.recipe.recipe_ingredients.first().ingredient.measurement_unit}): "\
+                                     f"{self.recipe.recipe_ingredients.first().amount}")  # noqa
