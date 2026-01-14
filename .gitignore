@@ -26,6 +26,11 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+migration_data/
+migrations/
+.coverage
+.coverage.*
+
 
 # Pytest
 .pytest_cache/
