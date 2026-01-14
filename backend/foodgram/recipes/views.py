@@ -2,9 +2,10 @@ from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.http import HttpResponse
 
 from .serializers import RecipeSerializer
-from .models import Recipe, Favorite
+from .models import Recipe, Favorite, ShoppingCart
 from . import permissions as user_permissions
 
 
@@ -37,9 +38,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         if is_in_shopping_cart is not None and user.is_authenticated:
             if is_in_shopping_cart == '1':
-                queryset = queryset.filter(in_carts__user=user)
+                queryset = queryset.filter(in_shopping_carts__user=user)
             else:
-                queryset = queryset.exclude(in_carts__user=user)
+                queryset = queryset.exclude(in_shopping_carts__user=user)
 
         if author:
             queryset = queryset.filter(author__id=author)
@@ -87,7 +88,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         for name, details in ingredient_totals.items():
             lines.append(f"- {name} ({details['measurement_unit']}): {details['amount']}\n")  # noqa
 
-        response = Response(lines, content_type='application/txt')
+        content = ''.join(lines)
+        response = HttpResponse(content, content_type='text/plain')
         response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'  # noqa
         return response
 
@@ -95,7 +97,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, pk=None):
         user = request.user
         recipe = self.get_object()
-        user_recipes = user.shopping_cart.recipes.all()
+
+        cart, created = ShoppingCart.objects.get_or_create(user=user)
+
+        user_recipes = cart.recipes.all()
 
         if request.method == 'POST':
             if recipe in user_recipes:

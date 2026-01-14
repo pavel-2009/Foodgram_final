@@ -1,8 +1,16 @@
 from rest_framework import serializers
+import base64
 
 from tags.serializers import TagSerializer
 from .models import Recipe, RecipeIngredient, Favorite, ShoppingCart
 from tags.models import Tag
+
+
+def validate_image(value):
+    try:
+        base64.b64decode(value, validate=True)
+    except Exception:
+        raise serializers.ValidationError('Image must be in valid base64 format.')  # noqa
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
@@ -31,6 +39,8 @@ class RecipeSerializer(serializers.ModelSerializer):
     )
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
+    image = serializers.CharField(validators=[validate_image])
+    cooking_time = serializers.IntegerField(min_value=1)
 
     class Meta:
         model = Recipe
@@ -58,7 +68,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         if not user.is_authenticated:
             return False
-        return ShoppingCart.objects.filter(user=user, recipe=obj).exists()
+        return ShoppingCart.objects.filter(user=user, recipes=obj).exists()
 
     def create(self, validated_data):
         ingredients_data = self.initial_data.get('ingredients', [])
@@ -89,6 +99,8 @@ class RecipeSerializer(serializers.ModelSerializer):
                 amount=total_amount
             )
 
+        recipe.full_clean()
+
         return recipe
 
     def update(self, instance, validated_data):
@@ -103,6 +115,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             if attr in normal_fields:
                 setattr(instance, attr, value)
+        instance.full_clean()
         instance.save()
 
         if tags_data is not None:

@@ -28,8 +28,6 @@ class ShoppingCartAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'recipes__name')
 
     def get_recipes(self, obj):
-        # возвращаем через запятую имена всех рецептов
         return ", ".join([recipe.name for recipe in obj.recipes.all()])
 
-    # чтобы колонка имела нормальное название
-    get_recipes.short_description = 'Recipes'
+    get_recipes.short_description = 'Recipes'  # type: ignore[attr-defined]

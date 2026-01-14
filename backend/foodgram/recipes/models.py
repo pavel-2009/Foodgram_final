@@ -78,7 +78,7 @@ class Favorite(models.Model):
 
 
 class ShoppingCart(models.Model):
-    user: models.ForeignKey = models.ForeignKey(
+    user: models.OneToOneField = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
         related_name='shopping_cart'
