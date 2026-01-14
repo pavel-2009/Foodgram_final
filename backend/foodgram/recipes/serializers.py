@@ -115,6 +115,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             if attr in normal_fields:
                 setattr(instance, attr, value)
+
         instance.full_clean()
         instance.save()
 
