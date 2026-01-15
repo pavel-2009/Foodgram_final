@@ -4,9 +4,22 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.http import HttpResponse
 
+import base64
+
 from .serializers import RecipeSerializer
 from .models import Recipe, Favorite, ShoppingCart
 from . import permissions as user_permissions
+
+
+def image_to_base64(image_field):
+    if not image_field:
+        return None
+    try:
+        with image_field.open('rb') as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')  # noqa
+        return encoded_string
+    except Exception:
+        return None
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
@@ -60,7 +73,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response({
                 'id': recipe.id,
                 'name': recipe.name,
-                'image': recipe.image,
+                'image': image_to_base64(recipe.image),
                 'cooking_time': recipe.cooking_time
             }, status=201)
 
@@ -112,7 +125,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response({
                 'id': recipe.id,
                 'name': recipe.name,
-                'image': recipe.image,
+                'image': image_to_base64(recipe.image),
                 'cooking_time': recipe.cooking_time
             }, status=201)
 

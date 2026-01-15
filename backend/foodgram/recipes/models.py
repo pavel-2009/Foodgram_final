@@ -1,8 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 
-import base64
-
 from users.models import User
 from tags.models import Tag
 from ingredients.models import Ingredient
@@ -24,7 +22,7 @@ class Recipe(models.Model):
         related_name='recipes',
     )
     name: models.CharField = models.CharField(max_length=200)
-    image: models.CharField = models.CharField()
+    image: models.ImageField = models.ImageField(upload_to='recipe_images/')
     text: models.TextField = models.TextField()
     cooking_time: models.PositiveIntegerField = models.PositiveIntegerField()
 
@@ -34,10 +32,6 @@ class Recipe(models.Model):
     def clean(self):
         if self.cooking_time < 1:
             raise ValidationError('Cooking time must be a positive integer.')
-        try:
-            base64.b64decode(self.image, validate=True)
-        except Exception:
-            raise ValidationError('Image must be in valid base64 format.')
         return super().clean()
 
 

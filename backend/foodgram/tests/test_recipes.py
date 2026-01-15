@@ -2,11 +2,30 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
 from rest_framework import status
+from django.core.files.base import ContentFile
+import io
+from PIL import Image
 
 from tags.models import Tag
 from users.models import User
 from ingredients.models import Ingredient
 from recipes.models import Recipe, RecipeIngredient, Favorite, ShoppingCart
+
+TEST_IMAGE_BASE64 = (
+    'iVBORw0KGgoAAAANSUhEUgAAAAUA'
+    'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
+    '//8/w38GIAXDIBKE0DHxgljNBAAO'
+    '9TXL0Y4OHwAAAABJRU5ErkJggg=='
+)
+
+
+def create_test_image():
+    """Create a simple test image file."""
+    file = io.BytesIO()
+    image = Image.new('RGB', (100, 100), color='red')
+    image.save(file, 'PNG')
+    file.seek(0)
+    return ContentFile(file.getvalue(), name='test_image.png')
 
 
 class RecipeModelTest(TestCase):
@@ -30,10 +49,7 @@ class RecipeModelTest(TestCase):
         self.recipe = Recipe.objects.create(
             author=self.author,
             name='Test Recipe',
-            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            image=create_test_image(),
             text='This is a test recipe.',
             cooking_time=10
         )
@@ -75,25 +91,11 @@ class RecipeModelTest(TestCase):
         expected_str = f"{self.recipe.name} - {self.ingredient1.name} (100.0)"
         self.assertEqual(str(recipe_ingredient), expected_str)
 
-    def test_invalid_image_format(self):
-        invalid_image_recipe = Recipe(
-            author=self.author,
-            name='Invalid Image Recipe',
-            image='NotAValidBase64String',
-            text='This recipe has invalid image format.',
-            cooking_time=10
-        )
-        with self.assertRaises(Exception):
-            invalid_image_recipe.clean()
-
     def test_cooking_time_validation(self):
         invalid_time_recipe = Recipe(
             author=self.author,
             name='Invalid Time Recipe',
-            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            image=create_test_image(),
             text='This recipe has invalid cooking time.',
             cooking_time=-1
         )
@@ -104,10 +106,7 @@ class RecipeModelTest(TestCase):
         valid_recipe = Recipe(
             author=self.author,
             name='Valid Recipe',
-            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            image=create_test_image(),
             text='This recipe has valid data.',
             cooking_time=5
         )
@@ -153,10 +152,7 @@ class RecipeAPITest(TestCase):
         self.recipe = Recipe.objects.create(
             author=self.author,
             name='API Test Recipe',
-            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            image=create_test_image(),
             text='This is a test recipe for API.',
             cooking_time=15
         )
@@ -177,16 +173,13 @@ class RecipeAPITest(TestCase):
 
         data = {
             'name': 'New API Recipe',
-            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            'image': TEST_IMAGE_BASE64,
             'text': 'This is a new recipe created via API.',
             'cooking_time': 20,
             'tags': [tag.id],
             'ingredients': []
         }
-        response = self.client.post('/api/recipes/', data)
+        response = self.client.post('/api/recipes/', data, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertIn('New API Recipe', str(response.content))
 
@@ -215,14 +208,11 @@ class RecipeAPITest(TestCase):
         data = {
             'author': self.author.id,
             'name': 'Unauthorized Recipe',
-            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            'image': TEST_IMAGE_BASE64,
             'text': 'This recipe should not be created.',
             'cooking_time': 30
         }
-        response = self.client.post('/api/recipes/', data)
+        response = self.client.post('/api/recipes/', data, format='json')
         self.assertEqual(response.status_code, 401)
 
     def test_update_notautorised_recipe_api(self):
@@ -364,10 +354,7 @@ class RecipeAPITest(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.post('/api/recipes/', {
             'name': 'New Recipe',
-            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            'image': TEST_IMAGE_BASE64,
             'text': 'This is a new recipe',
             'cooking_time': 15,
             'tags': [tag1.id, tag2.id],
@@ -387,10 +374,7 @@ class RecipeAPITest(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.post('/api/recipes/', {
             'name': 'New Recipe with Ingredients',
-            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            'image': TEST_IMAGE_BASE64,
             'text': 'This is a new recipe with ingredients',
             'cooking_time': 20,
             'tags': [],
@@ -411,10 +395,7 @@ class RecipeAPITest(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.user_token.key}')  # noqa
         response = self.client.post('/api/recipes/', {
             'name': 'Recipe with Duplicate Ingredients',
-            'image': 'iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                     'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                     '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                     '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            'image': TEST_IMAGE_BASE64,
             'text': 'This recipe has duplicate ingredients',
             'cooking_time': 25,
             'tags': [],
@@ -463,10 +444,7 @@ class TestFavoriteModel(TestCase):
         self.recipe = Recipe.objects.create(
             author=self.user,
             name='API Test Recipe',
-            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            image=create_test_image(),
             text='This is a test recipe for API.',
             cooking_time=15
         )
@@ -513,10 +491,7 @@ class TestShoppingCartModel(TestCase):
         self.recipe = Recipe.objects.create(
             author=self.user,
             name='Cart Test Recipe',
-            image='iVBORw0KGgoAAAANSUhEUgAAAAUA'
-                  'AAAFCAYAAACNbyblAAAAHElEQVQI12P4'
-                  '//8/w38GIAXDIBKE0DHxgljNBAAO'
-                  '9TXL0Y4OHwAAAABJRU5ErkJggg==',
+            image=create_test_image(),
             text='This is a test recipe for cart.',
             cooking_time=15
         )

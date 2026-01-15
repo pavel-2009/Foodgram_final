@@ -1,5 +1,6 @@
 from rest_framework import serializers
 import base64
+from django.core.files.base import ContentFile
 
 from tags.serializers import TagSerializer
 from .models import Recipe, RecipeIngredient, Favorite, ShoppingCart
@@ -11,6 +12,35 @@ def validate_image(value):
         base64.b64decode(value, validate=True)
     except Exception:
         raise serializers.ValidationError('Image must be in valid base64 format.')  # noqa
+
+
+class Base64ImageField(serializers.ImageField):
+    def to_internal_value(self, data):
+        if isinstance(data, str):
+            # Handle data:image/png;base64,... format
+            if data.startswith('data:image'):
+                format, imgstr = data.split(';base64,')
+                ext = format.split('/')[-1]
+                data = base64.b64decode(imgstr)
+                data = ContentFile(data, name='temp.' + ext)
+            else:
+                # Handle plain base64 format
+                try:
+                    decoded_data = base64.b64decode(data)
+                    data = ContentFile(decoded_data, name='recipe_image.png')
+                except Exception:
+                    pass
+        return super().to_internal_value(data)
+
+    def to_representation(self, value):
+        if not value:
+            return None
+        try:
+            with value.open('rb') as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')  # noqa
+                return encoded_string
+        except Exception:
+            return None
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
@@ -39,7 +69,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     )
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
-    image = serializers.CharField(validators=[validate_image])
+    image = Base64ImageField()
     cooking_time = serializers.IntegerField(min_value=1)
 
     class Meta:

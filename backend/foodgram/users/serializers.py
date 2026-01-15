@@ -1,7 +1,19 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+import base64
 
 User = get_user_model()
+
+
+def image_to_base64(image_field):
+    """Convert image field to base64 string."""
+    if not image_field:
+        return None
+    try:
+        with image_field.open('rb') as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    except Exception:
+        return None
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -57,6 +69,6 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
         return [{
             'id': recipe.id,
             'name': recipe.name,
-            'image': recipe.image,
+            'image': image_to_base64(recipe.image),
             'cooking_time': recipe.cooking_time
         } for recipe in recipes]
