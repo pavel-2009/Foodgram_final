@@ -1,8 +1,13 @@
-# build env
-FROM node:13.12.0-alpine as build
+FROM node:13.12.0-alpine AS builder
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
-COPY . ./
+COPY . .
 RUN npm run build
-CMD cp -r build result_build
+
+FROM alpine:latest
+RUN apk add --no-cache nginx
+COPY --from=builder /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
