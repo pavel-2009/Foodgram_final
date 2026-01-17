@@ -2,8 +2,8 @@ from django.db import models
 
 
 class Tag(models.Model):
-    name: models.CharField = models.CharField()
-    color: models.CharField = models.CharField()
+    name: models.CharField = models.CharField(max_length=200)
+    color: models.CharField = models.CharField(max_length=7)
     slug: models.SlugField = models.SlugField(unique=True)
 
     def __str__(self):

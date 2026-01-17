@@ -1,14 +1,18 @@
 FROM python:3.13-slim
 
-WORKDIR /app/foodgram
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn    
 
-COPY . .
+COPY . /app/backend
 
-EXPOSE 8000
+WORKDIR /app/backend/foodgram
 
 RUN python manage.py collectstatic --noinput
 
-CMD ["sh", "-c", "python manage.py migrate && gunicorn foodgram.wsgi:application --bind 0.0.0.0:8000"]
+EXPOSE 8000
+
