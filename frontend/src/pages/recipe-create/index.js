@@ -29,15 +29,20 @@ const RecipeCreate = ({ onEdit }) => {
     }
     api
       .getIngredients({ name: ingredientValue.name })
-      .then(ingredients => {
+      .then(data => {
+        const ingredients = data.results || data
         setIngredients(ingredients)
       })
   }, [ingredientValue.name])
 
   useEffect(_ => {
     api.getTags()
-      .then(tags => {
+      .then(data => {
+        const tags = data.results || data
         setValue(tags.map(tag => ({ ...tag, value: true })))
+      })
+      .catch(err => {
+        console.error('Error loading tags:', err)
       })
   }, [])
 
