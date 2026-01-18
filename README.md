@@ -1,107 +1,139 @@
-# Yandex_Diploma
+# Foodgram - Продуктовый помощник
 
-  version: '3.8'
-  services:
-    db:
-      image: postgres:15
-      environment:
-        POSTGRES_DB: foodgram
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: postgres
-      ports:
-        - "5432:5432"
-      volumes:
-        - pgdata:/var/lib/postgresql/data/
+Приложение для управления рецептами, ингредиентами и списками покупок.
 
-    backend:
-      build:
-        context: ../backend
-        dockerfile: Dockerfile
-      environment:
-        DJANGO_SECRET_KEY: "django-insecure-tl6c2r!qdu%45b!yn-xc!$!hxk(u%0044^+s_^o^(q=gl!%wq7"
-      command: >
-        sh -c "
-        until nc -z db 5432; do echo 'Waiting for postgres...'; sleep 1; done;
-        python manage.py migrate &&
-        python manage.py collectstatic --noinput &&
-        gunicorn foodgram.wsgi:application --bind 0.0.0.0:8000
-        "
-      volumes:
-      - static_volume:/app/backend/foodgram/static
-      depends_on:
-        - db
+## Стек технологий
 
-    frontend:
-      build:
-        context: ../frontend
-        dockerfile: Dockerfile
-      volumes:
-        - ../frontend:/app/result_build/
+**Backend:**
+- Django 6.0
+- Django REST Framework
+- PostgreSQL / SQLite
+- Gunicorn
 
-    nginx:
-      image: nginx:1.19.3
-      ports:
-        - "80:80"
-      volumes:
-        - ./nginx.conf:/etc/nginx/conf.d/default.conf
-        - ../frontend/build:/usr/share/nginx/html/
-        - static_volume:/usr/share/nginx/html/static 
-        - ./docs/:/usr/share/nginx/html/api/docs/
-      depends_on:
+**Frontend:**
+- React 17
+- React Router
+
+**DevOps:**
+- Docker & Docker Compose
+- GitHub Actions CI/CD
+- Nginx
+
+## Быстрый старт
+
+### Требования
+- Docker и Docker Compose
+- Python 3.13+ (для локальной разработки)
+
+### Запуск с Docker Compose
+
+```bash
+cd infra
+docker-compose up -d
+```
+
+После запуска создайте суперпользователя:
+```bash
+docker-compose exec backend python manage.py createsuperuser
+```
+
+Приложение будет доступно по адресу `http://localhost`
+Админ-панель: `http://localhost/admin`
+
+### Локальная разработка
+
+**Backend:**
+```bash
+cd backend/foodgram
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm start
+```
+
+## Структура проекта
+
+```
+.
+├── backend/              # Django приложение
+│   ├── foodgram/        # Основной проект
+│   ├── ingredients/     # Приложение ингредиентов
+│   ├── recipes/         # Приложение рецептов
+│   ├── tags/            # Приложение тегов
+│   └── users/           # Приложение пользователей
+├── frontend/             # React приложение
+├── infra/               # Docker & Nginx конфигурация
+└── docs/                # Документация API
+```
+
+## Переменные окружения
+
+Создайте `.env` файл в директории `infra/`:
+
+```env
+POSTGRES_DB=foodgram
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_PORT=5432
+
+DJANGO_SECRET_KEY=your-secret-key
+DEBUG=False
+```
+
+## API
+
+API документация доступна по адресу `/api/docs/`
+
+**Основные endpoints:**
+- `GET /api/recipes/` - список рецептов
+- `POST /api/recipes/` - создание рецепта
+- `GET /api/ingredients/` - список ингредиентов
+- `GET /api/tags/` - список тегов
+- `GET /api/users/` - список пользователей
+
+## Тестирование
+
+Запуск тестов:
+```bash
+cd backend/foodgram
+python manage.py test
+```
+
+Проверка покрытия:
+```bash
+coverage run manage.py test
+coverage report -m
+```
+
+**Покрытие кода: 96%**
+
+Проверка кода:
+```bash
+flake8 backend --max-line-length=120
+mypy backend
+```
+
+## CI/CD
+
+GitHub Actions автоматически запускает:
+- Юнит тесты
+- Lint проверки (flake8)
+- Type checking (mypy)
+- Docker build и push (при push в main)
+
+## Администраторская панель
+
+Доступна по адресу `/admin/` после авторизации суперпользователя.
+
+## Лицензия
+
+MIT
         - backend
 
-
-  volumes:
-    pgdata:
-      driver: local
-    static_volume:
-      driver: local 
-
-
-
-
-    server {
-        listen 80;
-
-        location /api/docs/ {
-            root /usr/share/nginx/html;
-            try_files $uri $uri/redoc.html;
-        }
-
-        location /api/ {
-            proxy_pass         http://backend;
-            proxy_set_header   Host $host;
-            proxy_set_header   X-Real-IP $remote_addr;
-            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header   X-Forwarded-Proto $scheme;
-        }
-
-
-        location /admin/ {
-            proxy_pass         http://backend;
-            proxy_set_header   Host $host;
-            proxy_set_header   X-Real-IP $remote_addr;
-            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header   X-Forwarded-Proto $scheme;
-        }
-
-
-
-        location /static/ {
-            alias /usr/share/nginx/html/static/;
-        }
-
-
-
-
-        location / {
-            root /usr/share/nginx/html;
-            index  index.html index.htm;
-            try_files $uri /index.html;
-        }
-
-        error_page 500 502 503 504 /50x.html;
-        location = /50x.html {
-            root /usr/share/nginx/html;
-        }
-    }
