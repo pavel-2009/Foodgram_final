@@ -12,6 +12,9 @@ jobs:
     test_and_clean_with_flake8_and_mypy:
         runs-on: ubuntu-latest
 
+        env:
+          CI: true
+
         steps:
         - name: Checkout code
           uses: actions/checkout@v2
