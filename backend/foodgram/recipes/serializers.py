@@ -114,7 +114,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         ingredients_dict = {}
         for ingredient_data in ingredients_data:
             ingredient_id = ingredient_data.get('id')
-            amount = ingredient_data.get('amount', 0)
+            amount = int(ingredient_data.get('amount', 0))
 
             if ingredient_id in ingredients_dict:
                 ingredients_dict[ingredient_id] += amount
